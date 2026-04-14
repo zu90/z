@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이미지 DB 갤러리</title>
+    <style>
+        body { background-color: #1a1a1a; color: #fff; font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px; }
+        h1 { color: #ffd700; text-align: center; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; justify-content: center; background: #2a2a2a; padding: 15px; border-radius: 10px; }
+        select, input, button { padding: 10px; border-radius: 5px; border: none; font-size: 14px; }
+        button { background: #ffd700; color: #000; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #ffcc00; transform: scale(1.05); }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .card { background: #333; padding: 10px; border-radius: 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .card img { max-width: 100%; height: auto; border-radius: 5px; background: #000; min-height: 150px; }
+        .card p { margin: 10px 0 5px; font-size: 12px; color: #ccc; word-break: break-all; }
+        .copy-btn { width: 100%; background: #444; color: #fff; margin-top: 5px; font-size: 11px; }
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { background: #555; color: #fff; }
+        .tab-btn.active { background: #ffd700; color: #000; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>✨ 이미지 미리보기 시스템 ✨</h1>
+    
+    <div class="tabs">
+        <button class="tab-btn active" onclick="showCategory('char')">캐릭터</button>
+        <button class="tab-btn" onclick="showCategory('place')">장소</button>
+        <button class="tab-btn" onclick="showCategory('scene')">장면</button>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="searchInput" placeholder="이름 검색..." oninput="render()">
+        <select id="emotionSelect" onchange="render()">
+            <option value="기본">감정: 기본</option>
+            <option value="분노">감정: 분노</option>
+            <option value="미소">감정: 미소</option>
+            <option value="슬픔">감정: 슬픔</option>
+            <option value="당황">감정: 당황</option>
+        </select>
+        <button onclick="copyAll()">전체 주소 복사</button>
+    </div>
+
+    <div id="gallery" class="gallery"></div>
+</div>
+
+<script>
+    const BASE_URL = "https://raw.githubusercontent.com/zu90/z/main/";
+    let currentCategory = 'char';
+
+    const db = {
+        char: "이도겸,남궁현,진소연,서이원,강유진,한도윤,윤서진,검화,연화,장돌,백설희,이융,장녹수,신씨왕비,윤대감,정씨부인,윤도혁,윤서린,심청,심봉사,콩쥐,팥쥐,팥쥐엄마,전우치,흥부,흥부처,놀부,놀부처,장채옥,황보윤,장성백,마축지,타박녀,서장금,민정호,최금영,최상궁,한상궁,강덕구,나주댁,대길,최장군,왕손,설화,언년,천지호,송태하,업복이,초복이,허준,허준엄마,다희아씨,예진아씨,유도지,유의태,황진이,단심,김은호,벽계수,김정한,매향,부용,백무,연생이,이생,현금,법운,혜명,콩순1-3살,콩순9-15살,콩순16-19살".split(','),
+        place: "감옥,강릉&태백산맥_낮,강릉&태백산맥_밤,강화도_낮,강화도_밤,개성_낮,개성_밤,객잔_낮,객잔_밤,곤장_낮,곤장_밤,골목길_낮,골목길_밤,공주&충주_낮,공주&충주_밤,관아_낮,관아_밤,궁궐_낮,궁궐_밤,궁궐_수라간_낮,궁궐_수라간_밤,궁궐_연못_낮,궁궐_연못_밤,궁궐_왕의침실_낮,궁궐_왕의침실_밤,궁궐_정전_낮,궁궐_정전_밤,궁궐_중전의침실_낮,궁궐_중전의침실_밤,기방_낮,기방_밤,기방룸,기방연회,기와집_낮,기와집_밤,내의원_낮,내의원_밤,마을논밭_낮,마을논밭_밤,대갓집_낮,대갓집_밤,동래_낮,동래_밤,마을_낮,마을_밤,마을빨래터_낮,마을빨래터_밤,마을우물가_낮,마을우물가_밤,마을초입_낮,마을초입_밤,무당집_낮,무당집_밤,무당집내부,바다_낮,바다_밤,벚꽃길_낮,벚꽃길_밤,산속사찰_낮,산속사찰_밤,산채_낮,산채_밤,서당_낮,서당_밤,성묘_낮,성묘_밤,시냇가_낮,시냇가_밤,안동_낮,안동_밤,의금부_낮,의금부_밤,의주(만상)_낮,의주(만상)_밤,장터_낮,장터_밤,저잣거리_낮,저잣거리_밤,전주_낮,전주_밤,제주도_낮,제주도_밤,조선소_낮,조선소_밤,주막_낮,주막_밤,상태좋은_초가집_밤,상태좋은_초가집_낮,평양_낮,평양_밤,한양_낮,한양_밤,함흥&육진_낮,함흥&육진_밤,갈대밭_낮,갈대밭_밤,개울_낮,개울_밤,꽃밭_낮,꽃밭_밤,나루터_낮,나루터_밤,동굴_낮,동굴_밤,밀림_낮,밀림_밤,숲_낮,숲_밤,어촌_낮,어촌_밤,연못_밤,연못_낮,온천_낮,온천_밤,절벽_낮,절벽_밤,죽림_낮,죽림_밤,지하투기장,책방_낮,책방_밤,폭포_낮,폭포_밤,호수_밤,호수_낮,0단계_미개간_밭,1단계_개간후_밭,3단계_싹이돋아난_밭,4단계_중간성장단계_밭,병든_밭,궁궐_목욕탕,담벼락_낮,담벼락_밤,행랑채_외관_낮,행랑채_외관_밤,허름한_가축우리_낮,허름한_가축우리_밤,허름한_초가집_낮,허름한_초가집_밤,5단계_수확기_완전성장_밭,궁궐_정전_사람없을때_낮,궁궐_정전_사람없을때_밤,양반집_사랑채_낮,양반집_사랑채_밤,양반집_안채_낮,양반집_안채_밤,양반집_부엌_낮,양반집_부엌_밤,행랑채_노비숙소_내부_낮,행랑채_노비숙소_내부_밤,허름한_집_부엌_낮,허름한_집_부엌_밤,마구간_낮,마구간_밤,포목점_낮,약방내부,어린이학당_낮,어린이학당_밤,염전_낮,염전_밤".split(','),
+        scene: "간택령,강강수월래_밤,결혼,그네뛰기_낮,무과시험,사당패공연,씨름대회,전기수의이야기판,창포물_머리감기,추석분위기마을,추수감사제,풍물놀이,화전놀이,과거시험,대홍수,도망노비추쇄,메뚜기떼창궐,문과시험,밤이될때,시민반란,아침이될때,가야금_연주,거문고_연주,꽃가마행렬_낮,나룻배타고이동중일때_낮,나룻배타고이동중일때_밤,여러명의기녀들이춤출때,저잣거리_기녀들의행렬_낮,포졸들_추적,하늘_고요한_밤,하늘_맑은날태양_낮,하늘_보름달_밤,하늘_비만내릴때_밤,하늘_비오는_낮,하늘_천둥번개와 비내릴때_밤,하늘_노을질때_낮,하늘_비내리고_노을질때_낮,콩순이_허름한돌상,콩순이_첫걸음마땔때,콩순16-19살_가출 또는_몰래나갈때,맷돌갈때,아궁이불지필때,감옥안에형틀차고수감됐을때_여자죄인,감옥안에형틀차고수감됐을때_남자죄인,남자양반_가마행렬_낮,남자양반_가마행렬_밤,여자양반_가마행렬_낮,여자양반_가마행렬_밤,궁궐밖_마을_왕의행렬_낮,궁궐안_왕과왕비의행렬_낮,대길일행_추적,연날리기_가을,연날리기_봄".split(',')
+    };
+
+    function showCategory(cat) {
+        currentCategory = cat;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('emotionSelect').style.display = cat === 'char' ? 'inline-block' : 'none';
+        render();
+    }
+
+    function render() {
+        const gallery = document.getElementById('gallery');
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const emo = document.getElementById('emotionSelect').value;
+        gallery.innerHTML = '';
+
+        db[currentCategory].forEach(item => {
+            if (!item.toLowerCase().includes(search)) return;
+
+            let fileName = item;
+            if (currentCategory === 'char') fileName += `_${emo}`;
+            const fullUrl = `${BASE_URL}${fileName}.png`;
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <img src="${fullUrl}" onerror="this.src='https://via.placeholder.com/250x150?text=이미지없음'">
+                <p><strong>${fileName}</strong></p>
+                <p>${fullUrl}</p>
+                <button class="copy-btn" onclick="copyText('${fullUrl}')">주소 복사</button>
+                <button class="copy-btn" onclick="copyText('![${fileName}](${fullUrl})')">마크다운 복사</button>
+            `;
+            gallery.appendChild(card);
+        });
+    }
+
+    function copyText(text) {
+        navigator.clipboard.writeText(text);
+        alert('복사되었습니다!');
+    }
+
+    function copyAll() {
+        const links = Array.from(document.querySelectorAll('.card p:nth-child(3)')).map(p => p.innerText).join('\n');
+        navigator.clipboard.writeText(links);
+        alert('현재 화면의 모든 주소가 복사되었습니다!');
+    }
+
+    render();
+</script>
+
+</body>
+</html>
